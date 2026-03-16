@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tool Login - TG Uploader</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+</head>
+<body>
+    <div class="noise-bg"></div>
+    <div class="gradient-sphere sphere-1"></div>
+    
+    <div class="container" style="max-width: 400px; margin-top: 15vh;">
+        <header style="justify-content: center; border: none;">
+            <div class="logo">
+                <i data-lucide="shield-check" class="logo-icon"></i>
+                <h1 class="font-outfit">Tool <span>Access</span></h1>
+            </div>
+        </header>
+
+        <section class="glass-card">
+            <form id="tool-login-form" class="auth-form">
+                <div class="input-group">
+                    <label>访问密码</label>
+                    <input type="password" id="tool-password" placeholder="请输入工具访问密码" required>
+                </div>
+                <button type="submit" class="primary-btn">进入系统</button>
+            </form>
+            <p id="error-msg" class="hint" style="color: #ef4444; margin-top: 1rem; text-align: center; display: none;"></p>
+        </section>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        document.getElementById('tool-login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const password = document.getElementById('tool-password').value;
+            const formData = new FormData();
+            formData.append('password', password);
+
+            const resp = await fetch('/api/tool/login', { method: 'POST', body: formData });
+            if (resp.ok) {
+                window.location.reload();
+            } else {
+                const msg = document.getElementById('error-msg');
+                msg.textContent = '密码不正确';
+                msg.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>

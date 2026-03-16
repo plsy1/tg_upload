@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  tg_upload:
+    build: .
+    container_name: tg_upload
+    ports:
+      - "${PORT:-8000}:${PORT:-8000}"
+    volumes:
+      # 1. 数据库和会话持久化
+      - ./data:/app/data
+      # 3. 映射下载目录
+      - ${LOCAL_DOWNLOAD_PATH:-./upload}:/downloads
+    environment:
+      - PORT=${PORT:-8000}
+      - TZ=${TZ:-Asia/Shanghai}
+      - AUTO_UPLOAD=${AUTO_UPLOAD:-true}
+      - SCAN_FOLDER=${SCAN_FOLDER:-/downloads}
+      - TARGET_CHAT=${TARGET_CHAT:-your_chat_id_here}
