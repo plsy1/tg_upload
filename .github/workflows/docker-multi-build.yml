@@ -1,0 +1,68 @@
+name: CI Docker GHCR Build
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'VERSION'
+  workflow_dispatch:
+
+jobs:
+  docker-amd64:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      version: ${{ steps.version.outputs.VERSION }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: echo "VERSION=$(cat VERSION | tr -d '\n')" >> $GITHUB_OUTPUT
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/tgupload:${{ steps.version.outputs.VERSION }}
+            ghcr.io/${{ github.repository_owner }}/tgupload:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    needs: [docker-amd64]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.docker-amd64.outputs.version }}
+          name: Release v${{ needs.docker-amd64.outputs.version }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

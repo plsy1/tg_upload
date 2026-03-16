@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TG Folder Uploader - Premium Tool</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+    <style>
+        /* Directory Browser Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        .modal-container {
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            width: 100%;
+            max-width: 600px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+        .modal-footer {
+            padding: 1.5rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+        }
+        .dir-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem 1rem;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .dir-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .dir-item.active {
+            background: var(--primary-glow);
+            border: 1px solid var(--primary);
+        }
+        .current-path-nav {
+            background: rgba(255,255,255,0.03);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            word-break: break-all;
+            margin-bottom: 1rem;
+        }
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        /* Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 46px;
+            height: 24px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255,255,255,0.1);
+            transition: .4s;
+            border: 1px solid var(--border);
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+        }
+        input:checked + .slider {
+            background-color: var(--primary);
+        }
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+        .slider.round {
+            border-radius: 24px;
+        }
+        .slider.round:before {
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <div class="noise-bg"></div>
+    <div class="gradient-sphere sphere-1"></div>
+    <div class="gradient-sphere sphere-2"></div>
+
+    <div class="container">
+        <header>
+            <div class="logo">
+                <i data-lucide="send" class="logo-icon"></i>
+                <h1 class="font-outfit">TG <span>Upload</span></h1>
+            </div>
+            <div class="status-badge" id="auth-status">
+                <span class="status-dot"></span>
+                <span class="status-text">未登录</span>
+            </div>
+        </header>
+
+        <main>
+            <!-- Login Card -->
+            <section id="login-section" class="glass-card {{ 'hidden' if is_tg_auth else '' }}">
+                <div class="card-header">
+                    <i data-lucide="lock"></i>
+                    <h2>Telegram 认证</h2>
+                </div>
+                <form id="setup-form" class="auth-form">
+                    <div class="input-group">
+                        <label>API ID</label>
+                        <input type="number" id="api_id" value="{{ config.api_id or '' }}" placeholder="从 my.telegram.org 获取" required>
+                    </div>
+                    <div class="input-group">
+                        <label>API Hash</label>
+                        <input type="text" id="api_hash" value="{{ config.api_hash or '' }}" placeholder="从 my.telegram.org 获取" required>
+                    </div>
+                    <div class="input-group">
+                        <label>手机号</label>
+                        <input type="tel" id="phone" value="{{ config.phone or '' }}" placeholder="+86 138..." required>
+                    </div>
+                    <button type="submit" class="primary-btn">连接 Telegram</button>
+                </form>
+
+                <div id="verify-form" class="auth-form hidden">
+                    <div class="input-group">
+                        <label>验证码</label>
+                        <input type="text" id="code" placeholder="输入 TG 收到的验证码" required>
+                    </div>
+                    <div class="input-group">
+                        <label>2FA 密码 (如有)</label>
+                        <input type="password" id="password" placeholder="两步验证密码 (未开启则不填)">
+                    </div>
+                    <button id="verify-btn" class="primary-btn">完成验证</button>
+                </div>
+            </section>
+
+            <!-- Upload Card -->
+            <section id="upload-section" class="glass-card {{ '' if is_tg_auth else 'hidden' }}">
+                <div class="card-header">
+                    <i data-lucide="folder-up"></i>
+                    <h2>文件夹上传</h2>
+                </div>
+                
+                <div class="input-group">
+                    <label>目标对话/频道</label>
+                    <div class="search-wrapper" style="margin-bottom: 0.5rem;">
+                        <div style="position: relative;">
+                            <i data-lucide="search" style="position: absolute; left: 0.75rem; top: 0.75rem; width: 16px; height: 16px; color: var(--text-muted);"></i>
+                            <input type="text" id="chat-search" placeholder="快速搜索对话名称..." style="padding-left: 2.5rem; width: 100%; font-size: 0.875rem;">
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <select id="chat-select" class="custom-select" style="flex: 1;">
+                            <option value="">点击下方按钮加载列表</option>
+                        </select>
+                        <button id="refresh-chats-btn" class="primary-btn" style="padding: 0 1rem;"><i data-lucide="refresh-cw"></i></button>
+                    </div>
+                    <div class="manual-input-wrapper">
+                        <input type="text" id="manual-chat-id" placeholder="或者是输入 @用户名 或 ID (如没在列表中看到)">
+                        <p class="hint">如果列表里没找到，请直接在此输入对方的 @username</p>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>本地文件夹绝对路径</label>
+                    <div class="path-input-wrapper" style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                        <div style="flex: 1;">
+                            <input type="text" id="folder-path" value="{{ config.get('last_folder', '') }}" placeholder="/Users/username/Desktop/my_folder" style="width: 100%;">
+                        </div>
+                        <button id="browse-folder-btn" class="primary-btn" title="浏览本地目录" style="padding: 0.75rem;"><i data-lucide="folder-search"></i></button>
+                    </div>
+                    <p class="hint">输入或选择文件夹的完整路径</p>
+                </div>
+
+                <div class="input-group" style="margin-top: 1.5rem; padding: 1.25rem; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <i data-lucide="zap" style="color: var(--primary); width: 20px; height: 20px;"></i>
+                            <h3 style="margin: 0; font-size: 1rem; font-weight: 600;">自动同步模式</h3>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="auto-upload-toggle" {{ 'checked' if config.get('auto_upload_enabled') else '' }}>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0.75rem 0 0 2.25rem; line-height: 1.4;">开启后，每隔 5 分钟自动扫描并上传新文件夹（不重复上传）。</p>
+                </div>
+
+                <div class="actions" style="margin-top: 1.5rem;">
+                    <button id="start-upload-btn" class="primary-btn pulse-on-hover" style="width: 100%;">
+                        <i data-lucide="upload-cloud"></i>
+                        立即手动开始上传
+                    </button>
+                </div>
+            </section>
+
+            <!-- Progress Card -->
+            <section id="progress-section" class="glass-card hidden">
+                <div class="card-header">
+                    <i data-lucide="activity"></i>
+                    <h2>实时进度</h2>
+                </div>
+                <div class="progress-stats">
+                    <div class="stat-item">
+                        <span class="label">当前文件:</span>
+                        <span id="current-file-name" class="value">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="label">进度:</span>
+                        <span id="progress-count" class="value">0 / 0</span>
+                    </div>
+                </div>
+                <div class="progress-bar-container">
+                    <div id="main-progress" class="progress-bar"></div>
+                </div>
+                <div id="log-console" class="log-console">
+                    <div class="log-line info">等待开始...</div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2024 TG Folder Uploader. Premium Edition.</p>
+        </footer>
+    </div>
+
+    <!-- Directory Browser Modal -->
+    <div id="dir-modal" class="modal-overlay hidden">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3 class="font-outfit">选择本地文件夹</h3>
+                <button id="close-modal" class="close-btn"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <div id="current-path" class="current-path-nav">正在加载...</div>
+                <div id="dir-list" class="dir-list">
+                    <!-- Items will be injected here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="select-dir-btn" class="primary-btn">选择当前目录</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+    <script>
+        window.LAST_CHAT_ID = "{{ config.get('last_chat', '') }}";
+        lucide.createIcons();
+    </script>
+</body>
+</html>
